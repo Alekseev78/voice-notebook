@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Голосовая записная книжка</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f4f6f8; color: #2c3e50; }
+    header { background: #2c3e50; color: white; padding: 14px 24px; font-size: 20px; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
+    .container { display: flex; gap: 16px; padding: 16px; max-width: 1200px; margin: 0 auto; }
+    .left-panel { width: 220px; flex-shrink: 0; }
+    .center-panel { flex: 1; }
+    .right-panel { width: 240px; flex-shrink: 0; }
+    .card { background: white; border-radius: 8px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    h3 { font-size: 13px; font-weight: bold; margin-bottom: 10px; color: #34495e; text-transform: uppercase; letter-spacing: 0.5px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
+    button { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; transition: opacity 0.2s; }
+    button:hover { opacity: 0.85; }
+    #recordBtn { background: #27ae60; color: white; }
+    #recordBtn.recording { background: #e74c3c; }
+    #saveBtn { background: #3498db; color: white; }
+    #clearBtn { background: #e74c3c; color: white; }
+    #settingsBtn { background: #8e44ad; color: white; }
+    #engineBadge { font-size: 12px; background: #f1c40f; color: #2c3e50; border-radius: 12px; padding: 4px 10px; font-weight: bold; }
+    #status { font-size: 12px; color: #7f8c8d; margin-bottom: 8px; min-height: 18px; }
+    textarea { width: 100%; height: 260px; border: 1px solid #dce1e7; border-radius: 6px; padding: 10px; font-size: 14px; resize: vertical; background: #ecf0f1; color: #2c3e50; font-family: Arial, sans-serif; }
+    input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
+    ul { list-style: none; max-height: 400px; overflow-y: auto; }
+    ul li { padding: 7px 8px; border-bottom: 1px solid #eef0f2; font-size: 12px; cursor: pointer; border-radius: 4px; word-break: break-all; }
+    ul li:hover { background: #eaf4fb; }
+    ul li.active { background: #d5f5e3; font-weight: bold; }
+
+    /* Календарь */
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; font-size: 11px; }
+    .cal-grid .day-header { text-align: center; font-weight: bold; color: #7f8c8d; padding: 2px 0; }
+    .cal-grid .day { text-align: center; padding: 4px 2px; border-radius: 4px; cursor: pointer; }
+    .cal-grid .day:hover { background: #d5e8f5; }
+    .cal-grid .day.today { background: #3498db; color: white; border-radius: 50%; }
+    .cal-grid .day.selected { background: #27ae60; color: white; border-radius: 50%; }
+    .cal-grid .day.has-notes { font-weight: bold; color: #27ae60; }
+    .cal-grid .day.has-notes.selected { color: white; }
+    .cal-grid .day.empty { cursor: default; }
+    .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: bold; }
+    .cal-nav button { background: none; border: 1px solid #ccc; padding: 2px 8px; font-size: 14px; border-radius: 4px; color: #2c3e50; font-weight: normal; }
+    #calDateLabel { font-size: 11px; color: #7f8c8d; margin-bottom: 6px; }
+    #calNotesList li { font-size: 11px; padding: 5px 6px; }
+    .note-time { color: #7f8c8d; margin-right: 4px; }
+
+    /* Модальное окно параметров */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: white; border-radius: 10px; padding: 24px; width: 380px; max-width: 95vw; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    .modal h2 { font-size: 16px; margin-bottom: 18px; color: #2c3e50; }
+    .modal-section { margin-bottom: 16px; }
+    .modal-section label { display: block; font-size: 13px; font-weight: bold; color: #34495e; margin-bottom: 6px; }
+    .modal-section .radio-group { display: flex; gap: 12px; }
+    .modal-section .radio-group label { font-weight: normal; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .modal-section select, .modal-section input[type=text] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; margin-bottom: 0; }
+    .modal-section .hint { font-size: 11px; color: #95a5a6; margin-top: 4px; }
+    .modal-section .warn { font-size: 11px; color: #e67e22; margin-top: 4px; }
+    .modal-divider { border: none; border-top: 1px solid #ecf0f1; margin: 14px 0; }
+    .modal-section.disabled { opacity: 0.4; pointer-events: none; }
+    .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .modal-buttons button { padding: 9px 20px; font-size: 14px; }
+    .btn-apply { background: #27ae60; color: white; }
+    .btn-cancel { background: #95a5a6; color: white; }
+
+    @media (max-width: 700px) {
+      .container { flex-direction: column; }
+      .left-panel, .right-panel { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  🎤 Голосовая записная книжка
+  <span id="engineBadge">Vosk</span>
+</header>
+
+<div class="container">
+  <!-- Левая колонка: Календарь -->
+  <div class="left-panel">
+    <div class="card">
+      <h3>📅 Календарь</h3>
+      <div class="cal-nav">
+        <button onclick="calPrev()">‹</button>
+        <span id="calMonthLabel"></span>
+        <button onclick="calNext()">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+    <div class="card">
+      <h3>Заметки за день</h3>
+      <div id="calDateLabel">Выберите дату</div>
+      <ul id="calNotesList"></ul>
+    </div>
+  </div>
+
+  <!-- Центральная колонка -->
+  <div class="center-panel">
+    <div class="card">
+      <div class="btn-row">
+        <button id="recordBtn" onclick="toggleRecord()">🎤 Начать запись</button>
+        <button id="saveBtn" onclick="saveNote()">💾 Сохранить</button>
+        <button id="clearBtn" onclick="clearText()">🗑️ Очистить</button>
+        <button id="settingsBtn" onclick="openSettings()">⚙️ Параметры</button>
+      </div>
+      <div id="status">Готов к работе</div>
+      <textarea id="textArea" placeholder="Распознанный текст появится здесь..."
+  oninput="highlightHashtags()"></textarea>
+
+    </div>
+  </div>
+
+  <!-- Правая колонка -->
+  <div class="right-panel">
+    <div class="card">
+      <h3>🔍 Поиск</h3>
+      <input type="text" id="searchInput" placeholder="Поиск по заметкам..." oninput="searchNotes()" />
+      <button onclick="loadNotes()" style="background:#95a5a6;color:white;width:100%;padding:7px;font-size:13px;">🔄 Обновить</button>
+    </div>
+    <div class="card">
+      <h3>Все заметки</h3>
+      <ul id="notesList"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно параметров -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙️ Параметры распознавания</h2>
+
+    <div class="modal-section">
+      <label>Движок распознавания</label>
+      <div class="radio-group">
+        <label><input type="radio" name="engine" value="vosk" onchange="onEngineChange()"> Vosk (офлайн, быстро)</label>
+        <label><input type="radio" name="engine" value="whisper" onchange="onEngineChange()"> Whisper (офлайн, точнее)</label>
+      </div>
+    </div>
+
+    <hr class="modal-divider">
+
+    <div class="modal-section" id="voskSection">
+      <label>Модель Vosk</label>
+      <select id="voskModelSelect">
+        <option value="vosk-model-small-ru-0.22">vosk-model-small-ru-0.22 (рекомендуется)</option>
+        <option value="vosk-model-ru-0.42">vosk-model-ru-0.42 (большая, точнее)</option>
+        <option value="vosk-model-small-en-us-0.15">vosk-model-small-en-us-0.15 (английский)</option>
+      </select>
+      <div class="hint">Папка модели должна лежать рядом с stt_service/main.py</div>
+    </div>
+
+    <div class="modal-section disabled" id="whisperSection">
+      <label>Размер модели Whisper</label>
+      <select id="whisperModelSelect">
+        <option value="tiny">tiny (~75 МБ, быстро)</option>
+        <option value="base" selected>base (~150 МБ, баланс)</option>
+        <option value="small">small (~460 МБ, точнее)</option>
+        <option value="medium">medium (~1.5 ГБ, хорошо)</option>
+        <option value="large">large (~3 ГБ, максимум)</option>
+      </select>
+      <label style="margin-top:10px;">Язык</label>
+      <input type="text" id="whisperLangInput" value="ru" placeholder="ru, en, de...">
+      <div class="hint">Оставь пустым для автоопределения языка</div>
+      <div class="warn">⚠ Требуется: pip install openai-whisper</div>
+    </div>
+
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="closeSettings()">Отмена</button>
+      <button class="btn-apply" onclick="applySettings()">✅ Применить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+
+// ============= НАСТРОЙКИ =============
+let settings = {
+  engine: 'vosk',
+  voskModel: 'vosk-model-small-ru-0.22',
+  whisperModel: 'base',
+  whisperLang: 'ru',
+};
+
+function loadSettings() {
+  const saved = localStorage.getItem('vnb_settings');
+  if (saved) settings = { ...settings, ...JSON.parse(saved) };
+  applyBadge();
+}
+
+function saveSettings() {
+  localStorage.setItem('vnb_settings', JSON.stringify(settings));
+}
+
+function applyBadge() {
+  const badge = document.getElementById('engineBadge');
+  if (settings.engine === 'vosk') {
+    badge.textContent = 'Vosk: ' + settings.voskModel.replace('vosk-model-', '');
+    badge.style.background = '#f1c40f';
+  } else {
+    badge.textContent = 'Whisper: ' + settings.whisperModel;
+    badge.style.background = '#9b59b6';
+    badge.style.color = 'white';
+  }
+}
+
+// ============= МОДАЛКА =============
+function openSettings() {
+  document.querySelector(`input[name=engine][value=${settings.engine}]`).checked = true;
+  document.getElementById('voskModelSelect').value = settings.voskModel;
+  document.getElementById('whisperModelSelect').value = settings.whisperModel;
+  document.getElementById('whisperLangInput').value = settings.whisperLang;
+  updateSections();
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function onEngineChange() {
+  updateSections();
+}
+
+function updateSections() {
+  const engine = document.querySelector('input[name=engine]:checked').value;
+  document.getElementById('voskSection').classList.toggle('disabled', engine !== 'vosk');
+  document.getElementById('whisperSection').classList.toggle('disabled', engine !== 'whisper');
+}
+
+function applySettings() {
+  settings.engine = document.querySelector('input[name=engine]:checked').value;
+  settings.voskModel = document.getElementById('voskModelSelect').value;
+  settings.whisperModel = document.getElementById('whisperModelSelect').value;
+  settings.whisperLang = document.getElementById('whisperLangInput').value.trim();
+  saveSettings();
+  applyBadge();
+  closeSettings();
+  setStatus('✅ Параметры сохранены. Движок: ' + settings.engine.toUpperCase());
+}
+
+// Закрыть по клику на фон
+document.getElementById('settingsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+
+// ============= ЗАПИСЬ =============
+let ws = null, recording = false, currentText = '';
+let audioCtx = null, processorNode = null, mediaStream = null;
+
+async function toggleRecord() {
+  if (!recording) await startRecord();
+  else stopRecord();
+}
+
+async function startRecord() {
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(e) {
+    setStatus('❌ Нет доступа к микрофону: ' + e.message); return;
+  }
+
+  const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const wsHost = API ? API.replace(/^https?:\/\//, '') : location.host;
+  const engine = settings.engine;
+  const engineParam = engine === 'whisper'
+    ? `engine=whisper&model=${settings.whisperModel}&lang=${settings.whisperLang}`
+    : `engine=vosk&model=${settings.voskModel}`;
+
+  ws = new WebSocket(`${wsProto}://${wsHost}/api/stream?${engineParam}`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => setStatus(`🎤 Запись [${engine.toUpperCase()}]... Говорите!`);
+  ws.onerror = () => setStatus('❌ Ошибка WebSocket');
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.text && data.text.trim()) { currentText += ' ' + data.text.trim(); updateTextArea(); }
+      if (data.partial && data.partial.trim()) updateTextArea(data.partial.trim());
+    } catch(_) {}
+  };
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const source = audioCtx.createMediaStreamSource(mediaStream);
+  processorNode = audioCtx.createScriptProcessor(4096, 1, 1);
+  processorNode.onaudioprocess = (e) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const f32 = e.inputBuffer.getChannelData(0);
+      const i16 = new Int16Array(f32.length);
+      for (let i = 0; i < f32.length; i++)
+        i16[i] = Math.max(-32768, Math.min(32767, f32[i] * 32768));
+      ws.send(i16.buffer);
+    }
+  };
+  source.connect(processorNode);
+  processorNode.connect(audioCtx.destination);
+
+  recording = true; currentText = '';
+  const btn = document.getElementById('recordBtn');
+  btn.textContent = '⏹️ Остановить запись';
+  btn.classList.add('recording');
+}
+
+function stopRecord() {
+  recording = false;
+  if (ws) { ws.close(); ws = null; }
+  if (processorNode) { processorNode.disconnect(); processorNode = null; }
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  const btn = document.getElementById('recordBtn');
+  btn.textContent = '🎤 Начать запись';
+  btn.classList.remove('recording');
+  setStatus('Запись остановлена');
+}
+
+function updateTextArea(partial = '') {
+  const ta = document.getElementById('textArea');
+  ta.value = currentText.trim() + (partial ? ' ' + partial : '');
+  highlightHashtags();
+}
+
+function highlightHashtags() {
+  const ta = document.getElementById('textArea');
+  const text = ta.value;
+  // Показываем найденные теги под полем
+  const voiceTags = [...text.matchAll(/х[еэ]штег\s+(\w+)/gi)].map(m => '#' + m[1]);
+  const symTags = [...text.matchAll(/#(\w+)/g)].map(m => '#' + m[1]);
+  const allTags = [...new Set([...voiceTags, ...symTags])];
+
+  let tagEl = document.getElementById('tagPreview');
+  if (!tagEl) {
+    tagEl = document.createElement('div');
+    tagEl.id = 'tagPreview';
+    tagEl.style.cssText = 'font-size:12px;color:#8e44ad;margin-top:4px;min-height:18px;';
+    ta.parentNode.insertBefore(tagEl, ta.nextSibling);
+  }
+  tagEl.textContent = allTags.length
+    ? '🏷️ Теги в имени файла: ' + allTags.join('  ')
+    : '';
+}
+
+
+function clearText() {
+  currentText = '';
+  document.getElementById('textArea').value = '';
+  setStatus('Текст очищен');
+}
+
+// ============= ЗАМЕТКИ =============
+let allNoteNames = [], datesWithNotes = new Set();
+
+async function saveNote() {
+  const text = document.getElementById('textArea').value.trim();
+  if (!text) { alert('Нет текста для сохранения'); return; }
+  const r = await fetch(`${API}/api/notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, engine: settings.engine })
+  });
+  const data = await r.json();
+  setStatus('✅ Сохранено: ' + data.filename);
+  await loadNotes();
+  renderCalendar();
+  if (selectedDate) loadNotesByDate(selectedDate);
+}
+
+async function loadNotes() {
+  const r = await fetch(`${API}/api/notes`);
+  allNoteNames = await r.json();
+  datesWithNotes = new Set(allNoteNames.map(n => extractDate(n)).filter(Boolean));
+  renderNotesList(allNoteNames);
+  renderCalendar();
+  setStatus(`Загружено заметок: ${allNoteNames.length}`);
+}
+
+function renderNotesList(names) {
+  const ul = document.getElementById('notesList');
+  ul.innerHTML = '';
+  names.forEach(name => {
+    const li = document.createElement('li');
+    li.textContent = name;
+    li.ondblclick = () => openNote(name);
+    ul.appendChild(li);
+  });
+}
+
+async function openNote(filename) {
+  const r = await fetch(`${API}/api/notes/${filename}`);
+  const data = await r.json();
+  document.getElementById('textArea').value = data.content;
+  currentText = data.content;
+  setStatus('Открыто: ' + filename);
+}
+
+async function searchNotes() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) { renderNotesList(allNoteNames); return; }
+  const r = await fetch(`${API}/api/search?q=${encodeURIComponent(q)}`);
+  const results = await r.json();
+  renderNotesList(results);
+  setStatus(`Найдено: ${results.length}`);
+}
+
+// ============= КАЛЕНДАРЬ =============
+let calYear = new Date().getFullYear(), calMonth = new Date().getMonth(), selectedDate = null;
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const DAYS_RU = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+function extractDate(filename) {
+  const m = filename.match(/note_(\d{4}-\d{2}-\d{2})_/);
+  return m ? m[1] : null;
+}
+
+function renderCalendar() {
+  document.getElementById('calMonthLabel').textContent = `${MONTHS_RU[calMonth]} ${calYear}`;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  DAYS_RU.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'day-header'; el.textContent = d; grid.appendChild(el);
+  });
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const offset = (firstDay + 6) % 7;
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  for (let i = 0; i < offset; i++) {
+    const el = document.createElement('div'); el.className = 'day empty'; grid.appendChild(el);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('div'); el.className = 'day'; el.textContent = d;
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if (dateStr === todayStr) el.classList.add('today');
+    if (dateStr === selectedDate) el.classList.add('selected');
+    if (datesWithNotes.has(dateStr)) el.classList.add('has-notes');
+    el.onclick = () => selectDate(dateStr);
+    grid.appendChild(el);
+  }
+}
+
+function selectDate(dateStr) { selectedDate = dateStr; renderCalendar(); loadNotesByDate(dateStr); }
+
+async function loadNotesByDate(dateStr) {
+  document.getElementById('calDateLabel').textContent = dateStr;
+  const r = await fetch(`${API}/api/notes/by-date?date_str=${dateStr}`);
+  const notes = await r.json();
+  const ul = document.getElementById('calNotesList');
+  ul.innerHTML = '';
+  if (!notes.length) { ul.innerHTML = '<li style="color:#aaa">Нет заметок</li>'; return; }
+  notes.forEach(name => {
+    const li = document.createElement('li');
+    const m = name.match(/note_\d{4}-\d{2}-\d{2}_(\d{2})-(\d{2})-(\d{2})/);
+    const time = m ? `${m[1]}:${m[2]}:${m[3]}` : '';
+    li.innerHTML = `<span class="note-time">${time}</span>${name}`;
+    li.ondblclick = () => openNote(name);
+    ul.appendChild(li);
+  });
+}
+
+function calPrev() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
+function calNext() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); }
+
+function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+// ============= СТАРТ =============
+loadSettings();
+loadNotes();
+</script>
+</body>
+</html>

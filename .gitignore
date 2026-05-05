@@ -1,0 +1,20 @@
+# Byte‑compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+$*py.class
+
+# Virtual environments
+venv/
+env/
+
+# Data directories (STT models) – exclude from repo
+backend/stt_service/vosk-model-ru-0.42/
+backend/stt_service/vosk-model-small-ru-0.22/
+
+# IDE settings
+.vscode/
+.idea/
+
+# Log files
+*.log
+/notes
